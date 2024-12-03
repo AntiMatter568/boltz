@@ -370,6 +370,7 @@ class AtomDiffusion(Module):
         self.step_scale = step_scale
         self.coordinate_augmentation = coordinate_augmentation
         self.alignment_reverse_diff = alignment_reverse_diff
+        print("alignment_reverse_diff:", alignment_reverse_diff)
         self.synchronize_sigmas = synchronize_sigmas
         self.use_inference_model_cache = use_inference_model_cache
 
@@ -451,6 +452,7 @@ class AtomDiffusion(Module):
         num_sampling_steps=None,
         multiplicity=1,
         train_accumulate_token_repr=False,
+        save_intermediate=False,
         **network_condition_kwargs,
     ):
         num_sampling_steps = default(num_sampling_steps, self.num_sampling_steps)
@@ -471,6 +473,11 @@ class AtomDiffusion(Module):
 
         token_repr = None
         token_a = None
+        
+        # Store intermediate structures if requested
+        intermediate_coords = []
+        if save_intermediate:
+            intermediate_coords.append(atom_coords.clone())
 
         # gradually denoise
         for sigma_tm, sigma_t, gamma in sigmas_and_gammas:
@@ -536,8 +543,15 @@ class AtomDiffusion(Module):
             )
 
             atom_coords = atom_coords_next
+            
+            if save_intermediate:
+                intermediate_coords.append(atom_coords.clone())
 
-        return dict(sample_atom_coords=atom_coords, diff_token_repr=token_repr)
+        return dict(
+            sample_atom_coords=atom_coords, 
+            diff_token_repr=token_repr,
+            intermediate_coords=intermediate_coords if save_intermediate else None
+        )
 
     def loss_weight(self, sigma):
         return (sigma**2 + self.sigma_data**2) / ((sigma * self.sigma_data) ** 2)

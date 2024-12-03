@@ -50,15 +50,14 @@ class BoltzWriter(BasePredictionWriter):
 
     def write_on_batch_end(
         self,
-        trainer: Trainer,  # noqa: ARG002
-        pl_module: LightningModule,  # noqa: ARG002
+        trainer: Trainer,
+        pl_module: LightningModule,
         prediction: dict[str, Tensor],
-        batch_indices: list[int],  # noqa: ARG002
+        batch_indices: list[int],
         batch: dict[str, Tensor],
-        batch_idx: int,  # noqa: ARG002
-        dataloader_idx: int,  # noqa: ARG002
+        batch_idx: int,
+        dataloader_idx: int,
     ) -> None:
-        """Write the predictions to disk."""
         if prediction["exception"]:
             self.failed += 1
             return
@@ -69,7 +68,6 @@ class BoltzWriter(BasePredictionWriter):
         # Get the predictions
         coords = prediction["coords"]
         coords = coords.unsqueeze(0)
-
         pad_masks = prediction["masks"]
 
         # Get ranking
@@ -82,7 +80,7 @@ class BoltzWriter(BasePredictionWriter):
             path = self.data_dir / f"{record.id}.npz"
             structure: Structure = Structure.load(path)
 
-            # Compute chain map with masked removed, to be used later
+            # Compute chain map with masked removed
             chain_map = {}
             for i, mask in enumerate(structure.mask):
                 if mask:
@@ -92,9 +90,42 @@ class BoltzWriter(BasePredictionWriter):
             structure = structure.remove_invalid_chains()
 
             for model_idx in range(coord.shape[0]):
-                # Get model coord
+                # Save intermediate structures if available
+                if "intermediate_coords" in prediction:
+                    intermediate_dir = self.output_dir / record.id / "intermediate"
+                    intermediate_dir.mkdir(exist_ok=True, parents=True)
+                    
+                    for step, step_coords in enumerate(prediction["intermediate_coords"]):
+                        # Get coordinates for current model and step
+                        model_step_coords = step_coords[model_idx]
+                        # Unpad using the same mask
+                        coord_unpad = model_step_coords[pad_mask.bool()]
+                        coord_unpad = coord_unpad.cpu().numpy()
+                        
+                        # Create new structure with intermediate coordinates
+                        atoms = structure.atoms.copy()
+                        atoms["coords"] = coord_unpad
+                        atoms["is_present"] = True
+                        
+                        new_structure = replace(
+                            structure,
+                            atoms=atoms,
+                            residues=structure.residues,
+                            interfaces=np.array([], dtype=Interface)
+                        )
+                        
+                        # Save intermediate structure
+                        path = intermediate_dir / f"{record.id}_model_{idx_to_rank[model_idx]}_step_{step}.{self.output_format}"
+                        with path.open("w") as f:
+                            if self.output_format == "pdb":
+                                f.write(to_pdb(new_structure))
+                            elif self.output_format == "mmcif":
+                                f.write(to_mmcif(new_structure))
+                            else:
+                                np.savez_compressed(path, **asdict(new_structure))
+
+                # Process final structure
                 model_coord = coord[model_idx]
-                # Unpad
                 coord_unpad = model_coord[pad_mask.bool()]
                 coord_unpad = coord_unpad.cpu().numpy()
 

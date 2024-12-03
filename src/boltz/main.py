@@ -514,7 +514,8 @@ def predict(
     torch.set_grad_enabled(False)
 
     # Ignore matmul precision warning
-    torch.set_float32_matmul_precision("highest")
+    # torch.set_float32_matmul_precision("highest")
+    torch.set_float32_matmul_precision("medium")
 
     # Set seed if desired
     if seed is not None:

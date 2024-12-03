@@ -261,6 +261,7 @@ class Boltz1(LightningModule):
         multiplicity_diffusion_train: int = 1,
         diffusion_samples: int = 1,
         run_confidence_sequentially: bool = False,
+        save_intermediate: bool = True,
     ) -> dict[str, Tensor]:
         dict_out = {}
 
@@ -327,6 +328,7 @@ class Boltz1(LightningModule):
                     feats=feats,
                     relative_position_encoding=relative_position_encoding,
                     multiplicity=multiplicity_diffusion_train,
+                    save_intermediate=save_intermediate,
                 )
             )
 
@@ -342,6 +344,7 @@ class Boltz1(LightningModule):
                     atom_mask=feats["atom_pad_mask"],
                     multiplicity=diffusion_samples,
                     train_accumulate_token_repr=self.training,
+                    save_intermediate=save_intermediate,
                 )
             )
 
@@ -1121,10 +1124,12 @@ class Boltz1(LightningModule):
                 num_sampling_steps=self.predict_args["sampling_steps"],
                 diffusion_samples=self.predict_args["diffusion_samples"],
                 run_confidence_sequentially=True,
+                save_intermediate=True,
             )
             pred_dict = {"exception": False}
             pred_dict["masks"] = batch["atom_pad_mask"]
             pred_dict["coords"] = out["sample_atom_coords"]
+            pred_dict["intermediate_coords"] = out["intermediate_coords"]
             if self.predict_args.get("write_confidence_summary", True):
                 pred_dict["confidence_score"] = (
                     4 * out["complex_plddt"] +
