@@ -477,7 +477,8 @@ class AtomDiffusion(Module):
         # Store intermediate structures if requested
         intermediate_coords = []
         if save_intermediate:
-            intermediate_coords.append(atom_coords.clone())
+            # Store initial coordinates on CPU
+            intermediate_coords.append(atom_coords.detach().cpu())
 
         # gradually denoise
         for sigma_tm, sigma_t, gamma in sigmas_and_gammas:
@@ -545,7 +546,8 @@ class AtomDiffusion(Module):
             atom_coords = atom_coords_next
             
             if save_intermediate:
-                intermediate_coords.append(atom_coords.clone())
+                # Store intermediate coordinates on CPU
+                intermediate_coords.append(atom_coords.detach().cpu())
 
         return dict(
             sample_atom_coords=atom_coords, 
